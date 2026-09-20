@@ -1699,7 +1699,7 @@ async function createWidget(params: z.infer<typeof createWidgetSchema>) {
 // Tool: update_widget
 const updateWidgetSchema = z.object({
   widgetId: z.coerce.number().describe("ID of the widget to update"),
-  dashboardId: z.coerce.number().describe("ID of the dashboard the widget belongs to"),
+  dashboardId: z.coerce.number().optional().describe("ID of the dashboard the widget belongs to; required unless both text and options are supplied"),
   text: z.string().optional().describe("Text content for text widgets"),
   options: z.record(z.string(), z.any()).optional().describe("Widget options; replaces the stored options when given"),
   position: widgetPositionSchema.optional()
@@ -1708,10 +1708,18 @@ const updateWidgetSchema = z.object({
 async function updateWidget(params: z.infer<typeof updateWidgetSchema>) {
   try {
     const { widgetId, dashboardId, position, text, options } = params;
-    const currentWidget = await getRedashClient().getWidget(widgetId, dashboardId);
-    const baseOptions = options ?? currentWidget.options ?? {};
+    // Complete replacements do not need a read, preserving existing callers.
+    // Partial updates must read the stored fields to avoid erasing them.
+    const needsCurrentWidget = text === undefined || options === undefined;
+    if (needsCurrentWidget && dashboardId === undefined) {
+      throw new Error("Add dashboardId to preserve the widget's existing text and options during a partial update. Find it with list_dashboards or get_dashboard_layout. To replace both fields without reading the dashboard, supply both text and options.");
+    }
+    const currentWidget = needsCurrentWidget && dashboardId !== undefined
+      ? await getRedashClient().getWidget(widgetId, dashboardId)
+      : undefined;
+    const baseOptions = options ?? currentWidget?.options ?? {};
     const widgetData: UpdateWidgetRequest = {
-      text: text ?? currentWidget.text ?? "",
+      text: text ?? currentWidget?.text ?? "",
       options: position ? buildWidgetLayoutOptions(baseOptions, position) : baseOptions
     };
 

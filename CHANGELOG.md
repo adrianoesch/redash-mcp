@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Widget tool compatibility
+
+- Widget reads, layout updates, and parameter mapping updates now require the owning `dashboardId`. This fixes reads that previously used an unsupported Redash endpoint.
+- Partial `update_widget` calls also require `dashboardId` to preserve existing fields. Full replacements supplying both `text` and `options` continue to work without it. Missing IDs produce an actionable error before any write.
+- `update_widget` no longer advertises the ignored `width` and `visualization_id` arguments. See [Widget tool migration](README.md#widget-tool-migration) for affected tools and examples.
+- Text widget creation now sends the null `visualization_id` required by Redash.
+
 ## [v0.0.16](https://github.com/suthio/redash-mcp/compare/v0.0.15...v0.0.16) - 2026-08-07
 
 - Reuse Redash request error formatting by @kahirokunn in https://github.com/suthio/redash-mcp/pull/77
