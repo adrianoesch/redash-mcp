@@ -186,6 +186,65 @@ describe("Redash MCP server", () => {
       }
     });
 
+    it("preserves complete updates without a dashboard ID, including empty text", async () => {
+      const readSpy = jest.spyOn(redashClient, "getWidget");
+      const updateSpy = jest.spyOn(redashClient, "updateWidget").mockResolvedValue({ id: 317 } as never);
+      const connection = await connectDirectClient();
+      try {
+        const result = await connection.client.callTool({
+          name: "update_widget",
+          arguments: { widgetId: 317, text: "", options: {} },
+        });
+        expect(result.isError).not.toBe(true);
+        expect(readSpy).not.toHaveBeenCalled();
+        expect(updateSpy).toHaveBeenCalledWith(317, { text: "", options: {} });
+      } finally {
+        await connection.close();
+      }
+    });
+
+    it.each([
+      { text: "new text" },
+      { options: {} },
+      { position: { row: 2 } },
+      {},
+    ])("rejects partial updates without a dashboard ID before writing: %j", async (patch) => {
+      const readSpy = jest.spyOn(redashClient, "getWidget");
+      const updateSpy = jest.spyOn(redashClient, "updateWidget");
+      const connection = await connectDirectClient();
+      try {
+        const result = await connection.client.callTool({
+          name: "update_widget", arguments: { widgetId: 317, ...patch },
+        });
+        expect(result.isError).toBe(true);
+        expect(JSON.stringify(result.content)).toContain("Add dashboardId");
+        expect(readSpy).not.toHaveBeenCalled();
+        expect(updateSpy).not.toHaveBeenCalled();
+      } finally {
+        await connection.close();
+      }
+    });
+
+    it("applies a position patch to explicitly supplied replacement options without reading", async () => {
+      const readSpy = jest.spyOn(redashClient, "getWidget");
+      const updateSpy = jest.spyOn(redashClient, "updateWidget").mockResolvedValue({ id: 317 } as never);
+      const connection = await connectDirectClient();
+      try {
+        const result = await connection.client.callTool({
+          name: "update_widget",
+          arguments: { widgetId: 317, text: "Title", options: storedOptions, position: { row: 2 } },
+        });
+        expect(result.isError).not.toBe(true);
+        expect(readSpy).not.toHaveBeenCalled();
+        expect(updateSpy).toHaveBeenCalledWith(317, {
+          text: "Title",
+          options: { ...storedOptions, position: { ...storedOptions.position, row: 2 } },
+        });
+      } finally {
+        await connection.close();
+      }
+    });
+
     it("sends a null visualization_id for text widgets", async () => {
       const createSpy = jest.spyOn(redashClient, "createWidget").mockResolvedValue({ id: 400 } as never);
       const connection = await connectDirectClient();

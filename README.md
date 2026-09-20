@@ -370,6 +370,28 @@ therefore returned with all of its field paths even when `pageSize` is `1`.
 - `get_widget_parameter_mappings`: Inspect a widget's parameter mappings
 - `update_widget_parameter_mappings`: Update a widget's parameter mappings
 
+### Widget tool migration
+
+Widget reads now use the dashboard API because Redash does not expose `GET /api/widgets/:id`. Add the owning `dashboardId` when calling `get_widget`, `get_widget_parameter_mappings`, `update_widget_layout`, or `update_widget_parameter_mappings`.
+
+For `update_widget`, `dashboardId` is required only when `text` or `options` is omitted. The tool reads the stored fields before applying a partial update, preserving existing text, layout, and parameter mappings. Calls supplying both `text` and `options` still work without `dashboardId`; `options` replaces the entire stored options object, so use this form only for an intentional full replacement.
+
+For example, a text-only update should change from:
+
+```json
+{"widgetId": 317, "text": "Updated title"}
+```
+
+to:
+
+```json
+{"widgetId": 317, "dashboardId": 53, "text": "Updated title"}
+```
+
+Use `list_dashboards` to find the dashboard ID, then `get_dashboard` or `get_dashboard_layout` to find its widget IDs. A partial `update_widget` call without `dashboardId` returns an actionable error without writing anything. MCP clients should refresh their tool definitions after upgrading; fixed scripts must add the argument explicitly.
+
+`update_widget` no longer advertises `width` or `visualization_id`, which Redash ignores on updates. Use `position.sizeX` for grid width; changing the visualization requires creating a replacement widget.
+
 ### Visualization Management
 - `create_visualization`: Create a new visualization for a query
 - `update_visualization`: Update an existing visualization
